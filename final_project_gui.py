@@ -70,24 +70,32 @@ def update_book_copies(cursor, conn, book_id, copies):
         conn.rollback()
         raise e
 
-# === Borrow/Return Functions ===
+# === Borrow/Return Functions with dual try ===
 def borrow_book(cursor, conn, member_id, book_id, loan_date, due_date):
     try:
-        # CALL stored procedure with double quotes and explicit date cast
-        cursor.execute('CALL "BorrowBook"(%s, %s, %s::date, %s::date)', 
-                       (member_id, book_id, loan_date, due_date))
+        # Try function call first
+        cursor.execute('SELECT "BorrowBook"(%s, %s, %s::date, %s::date)', (member_id, book_id, loan_date, due_date))
         conn.commit()
-    except Exception as e:
-        conn.rollback()
-        st.error(f"Error calling stored procedure BorrowBook: {e}")
+    except Exception as e_func:
+        try:
+            # If function fails, try procedure call
+            cursor.execute('CALL "BorrowBook"(%s, %s, %s::date, %s::date)', (member_id, book_id, loan_date, due_date))
+            conn.commit()
+        except Exception as e_proc:
+            conn.rollback()
+            st.error(f"Error calling BorrowBook function: {e_func}\nError calling BorrowBook procedure: {e_proc}")
 
 def return_book(cursor, conn, borrow_id, return_date):
     try:
-        cursor.execute('CALL "ReturnBook"(%s, %s::date)', (borrow_id, return_date))
+        cursor.execute('SELECT "ReturnBook"(%s, %s::date)', (borrow_id, return_date))
         conn.commit()
-    except Exception as e:
-        conn.rollback()
-        st.error(f"Error calling stored procedure ReturnBook: {e}")
+    except Exception as e_func:
+        try:
+            cursor.execute('CALL "ReturnBook"(%s, %s::date)', (borrow_id, return_date))
+            conn.commit()
+        except Exception as e_proc:
+            conn.rollback()
+            st.error(f"Error calling ReturnBook function: {e_func}\nError calling ReturnBook procedure: {e_proc}")
 
 # === Fine Functions ===
 def pay_fine(cursor, conn, fine_id):
