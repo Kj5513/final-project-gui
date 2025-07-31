@@ -30,29 +30,45 @@ def get_members(cursor):
     return fetch_all(cursor, "SELECT memberid, name, email, phonenumber FROM member ORDER BY memberid")
 
 def add_member(cursor, conn, name, email, phone):
-    execute_commit(cursor, conn, 
-        "INSERT INTO member (name, email, phonenumber) VALUES (%s, %s, %s)",
-        (name, email, phone)
-    )
+    try:
+        execute_commit(cursor, conn, 
+            "INSERT INTO member (name, email, phonenumber) VALUES (%s, %s, %s)",
+            (name, email, phone)
+        )
+    except Exception as e:
+        conn.rollback()  # rollback to avoid transaction lock
+        raise e
 
 def delete_member(cursor, conn, member_id):
-    execute_commit(cursor, conn, "DELETE FROM member WHERE memberid = %s", (member_id,))
+    try:
+        execute_commit(cursor, conn, "DELETE FROM member WHERE memberid = %s", (member_id,))
+    except Exception as e:
+        conn.rollback()
+        raise e
 
 # === Book Functions ===
 def get_books(cursor):
     return fetch_all(cursor, "SELECT bookid, title, author, copiesavailable FROM book ORDER BY bookid")
 
 def add_book(cursor, conn, title, author, copies):
-    execute_commit(cursor, conn,
-        "INSERT INTO book (title, author, copiesavailable) VALUES (%s, %s, %s)",
-        (title, author, copies)
-    )
+    try:
+        execute_commit(cursor, conn,
+            "INSERT INTO book (title, author, copiesavailable) VALUES (%s, %s, %s)",
+            (title, author, copies)
+        )
+    except Exception as e:
+        conn.rollback()
+        raise e
 
 def update_book_copies(cursor, conn, book_id, copies):
-    execute_commit(cursor, conn,
-        "UPDATE book SET copiesavailable = %s WHERE bookid = %s",
-        (copies, book_id)
-    )
+    try:
+        execute_commit(cursor, conn,
+            "UPDATE book SET copiesavailable = %s WHERE bookid = %s",
+            (copies, book_id)
+        )
+    except Exception as e:
+        conn.rollback()
+        raise e
 
 # === Borrow/Return Functions ===
 def borrow_book(cursor, conn, member_id, book_id, loan_date, due_date):
@@ -60,6 +76,7 @@ def borrow_book(cursor, conn, member_id, book_id, loan_date, due_date):
         cursor.callproc("BorrowBook", (member_id, book_id, loan_date, due_date))
         conn.commit()
     except Exception as e:
+        conn.rollback()
         st.error(f"Error calling stored procedure BorrowBook: {e}")
 
 def return_book(cursor, conn, borrow_id, return_date):
@@ -67,11 +84,16 @@ def return_book(cursor, conn, borrow_id, return_date):
         cursor.callproc("ReturnBook", (borrow_id, return_date))
         conn.commit()
     except Exception as e:
+        conn.rollback()
         st.error(f"Error calling stored procedure ReturnBook: {e}")
 
 # === Fine Functions ===
 def pay_fine(cursor, conn, fine_id):
-    execute_commit(cursor, conn, "UPDATE fine SET paid = 'Yes' WHERE fineid = %s", (fine_id,))
+    try:
+        execute_commit(cursor, conn, "UPDATE fine SET paid = 'Yes' WHERE fineid = %s", (fine_id,))
+    except Exception as e:
+        conn.rollback()
+        raise e
 
 def get_all_fines(cursor):
     query = """
@@ -226,6 +248,4 @@ def main():
     conn.close()
 
 if __name__ == "__main__":
-    # ✅ Run the app with:
-    # streamlit run "Final Project GuI.py"
     main()
