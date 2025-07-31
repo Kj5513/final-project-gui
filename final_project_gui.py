@@ -1,5 +1,6 @@
 import streamlit as st
 import psycopg2
+import pandas as pd
 
 # ---------------------- PostgreSQL Connection ----------------------
 def connect_to_database():
@@ -73,7 +74,6 @@ def update_book_copies(cursor, conn, book_id, copies):
 # === Borrow/Return Functions ===
 def borrow_book(cursor, conn, member_id, book_id, loan_date, due_date):
     try:
-        # Removed explicit ::date casts
         cursor.execute('CALL "BorrowBook"(%s, %s, %s, %s)', (member_id, book_id, loan_date, due_date))
         conn.commit()
         st.success("Book borrowed successfully.")
@@ -177,7 +177,11 @@ def main():
 
     st.subheader("Members List")
     members = get_members(cursor)
-    st.table(members)
+    if members:
+        df_members = pd.DataFrame(members, columns=["Member ID", "Name", "Email", "Phone Number"])
+        st.table(df_members)
+    else:
+        st.write("No members found.")
 
     # --- Books ---
     st.header("Manage Books")
@@ -213,7 +217,11 @@ def main():
 
     st.subheader("Books List")
     books = get_books(cursor)
-    st.table(books)
+    if books:
+        df_books = pd.DataFrame(books, columns=["Book ID", "Title", "Author", "Copies Available"])
+        st.table(df_books)
+    else:
+        st.write("No books found.")
 
     # --- Borrow/Return ---
     st.header("Borrow/Return Books")
@@ -249,21 +257,30 @@ def main():
 
     st.subheader("All Fines")
     fines = get_all_fines(cursor)
-    st.table(fines)
+    if fines:
+        df_fines = pd.DataFrame(fines, columns=["Fine ID", "Borrow ID", "Amount", "Paid", "Member ID", "Member Name"])
+        st.table(df_fines)
+    else:
+        st.write("No fines found.")
 
     with st.expander("Search Unpaid Fines by Member ID"):
         search_mem_id = st.text_input("Member ID", key="search_unpaid_member")
         if st.button("Search Unpaid Fines"):
             if search_mem_id.isdigit():
                 unpaid = search_unpaid_fines(cursor, int(search_mem_id))
-                st.table(unpaid)
+                if unpaid:
+                    df_unpaid = pd.DataFrame(unpaid, columns=["Fine ID", "Borrow ID", "Amount", "Paid"])
+                    st.table(df_unpaid)
+                else:
+                    st.write("No unpaid fines found for that member.")
             else:
                 st.error("Please enter a valid numeric Member ID.")
 
     st.subheader("Fine Audit History")
     columns, audit_data = get_fine_audit_history(cursor)
     if audit_data:
-        st.dataframe(audit_data, column_order=columns)
+        df_audit = pd.DataFrame(audit_data, columns=columns)
+        st.dataframe(df_audit)
     else:
         st.write("No fine audit history available.")
 
@@ -272,4 +289,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
