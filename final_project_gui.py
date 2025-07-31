@@ -6,10 +6,11 @@ def connect_to_database():
     try:
         conn = psycopg2.connect(
             dbname="postgres",
-            user="postgres",
-            password="fobvIs-ganma9-pumgid",
-            host="db.mvajileusmcjthjhndnh.supabase.co",
-            port="5432"
+            user="postgres.mvajileusmcjthjhndnh",
+            password="Ketwonereid@1234",
+            host="aws-0-us-east-1.pooler.supabase.com",
+            port="6543",
+            sslmode="require"
         )
         return conn
     except Exception as e:
@@ -104,7 +105,7 @@ def get_fine_audit_history(cursor):
 def main():
     st.title("Library Management System - Supabase")
 
-    conn = connect_to_database()  # Corrected here
+    conn = connect_to_database()
     if not conn:
         st.stop()
     cursor = conn.cursor()
