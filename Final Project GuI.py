@@ -1,6 +1,5 @@
 import streamlit as st
 import psycopg2
-psycopg2-binary
 
 # ---------------------- PostgreSQL Connection ----------------------
 def connect_to_database():
