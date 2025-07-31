@@ -73,7 +73,8 @@ def update_book_copies(cursor, conn, book_id, copies):
 # === Borrow/Return Functions ===
 def borrow_book(cursor, conn, member_id, book_id, loan_date, due_date):
     try:
-        cursor.execute('CALL "BorrowBook"(%s, %s, %s::date, %s::date)', (member_id, book_id, loan_date, due_date))
+        # Removed explicit ::date casts
+        cursor.execute('CALL "BorrowBook"(%s, %s, %s, %s)', (member_id, book_id, loan_date, due_date))
         conn.commit()
         st.success("Book borrowed successfully.")
     except Exception as e:
@@ -82,7 +83,7 @@ def borrow_book(cursor, conn, member_id, book_id, loan_date, due_date):
 
 def return_book(cursor, conn, borrow_id, return_date):
     try:
-        cursor.execute('CALL "ReturnBook"(%s, %s::date)', (borrow_id, return_date))
+        cursor.execute('CALL "ReturnBook"(%s, %s)', (borrow_id, return_date))
         conn.commit()
         st.success("Book returned successfully.")
     except Exception as e:
@@ -271,3 +272,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
