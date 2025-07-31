@@ -73,7 +73,9 @@ def update_book_copies(cursor, conn, book_id, copies):
 # === Borrow/Return Functions ===
 def borrow_book(cursor, conn, member_id, book_id, loan_date, due_date):
     try:
-        cursor.callproc("BorrowBook", (member_id, book_id, loan_date, due_date))
+        # Explicitly cast dates to PostgreSQL date type
+        cursor.execute("SELECT BorrowBook(%s, %s, %s::date, %s::date)", 
+                       (member_id, book_id, loan_date, due_date))
         conn.commit()
     except Exception as e:
         conn.rollback()
@@ -81,7 +83,8 @@ def borrow_book(cursor, conn, member_id, book_id, loan_date, due_date):
 
 def return_book(cursor, conn, borrow_id, return_date):
     try:
-        cursor.callproc("ReturnBook", (borrow_id, return_date))
+        # Explicitly cast return_date to date
+        cursor.execute("SELECT ReturnBook(%s, %s::date)", (borrow_id, return_date))
         conn.commit()
     except Exception as e:
         conn.rollback()
