@@ -73,23 +73,21 @@ def update_book_copies(cursor, conn, book_id, copies):
 # === Borrow/Return Functions ===
 def borrow_book(cursor, conn, member_id, book_id, loan_date, due_date):
     try:
-        # Call the BorrowBook function with SELECT
-        cursor.execute('SELECT "BorrowBook"(%s, %s, %s::date, %s::date)', (member_id, book_id, loan_date, due_date))
+        cursor.execute('CALL "BorrowBook"(%s, %s, %s::date, %s::date)', (member_id, book_id, loan_date, due_date))
         conn.commit()
         st.success("Book borrowed successfully.")
     except Exception as e:
         conn.rollback()
-        st.error(f"Error calling BorrowBook function: {e}")
+        st.error(f"Error calling BorrowBook procedure: {e}")
 
 def return_book(cursor, conn, borrow_id, return_date):
     try:
-        # Assuming ReturnBook function exists similarly
-        cursor.execute('SELECT "ReturnBook"(%s, %s::date)', (borrow_id, return_date))
+        cursor.execute('CALL "ReturnBook"(%s, %s::date)', (borrow_id, return_date))
         conn.commit()
         st.success("Book returned successfully.")
     except Exception as e:
         conn.rollback()
-        st.error(f"Error calling ReturnBook function: {e}")
+        st.error(f"Error calling ReturnBook procedure: {e}")
 
 # === Fine Functions ===
 def pay_fine(cursor, conn, fine_id):
