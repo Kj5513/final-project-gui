@@ -36,7 +36,7 @@ def add_member(cursor, conn, name, email, phone):
             (name, email, phone)
         )
     except Exception as e:
-        conn.rollback()  # rollback to avoid transaction lock
+        conn.rollback()
         raise e
 
 def delete_member(cursor, conn, member_id):
@@ -73,8 +73,8 @@ def update_book_copies(cursor, conn, book_id, copies):
 # === Borrow/Return Functions ===
 def borrow_book(cursor, conn, member_id, book_id, loan_date, due_date):
     try:
-        # Explicitly cast dates to PostgreSQL date type
-        cursor.execute("SELECT BorrowBook(%s, %s, %s::date, %s::date)", 
+        # CALL stored procedure with double quotes and explicit date cast
+        cursor.execute('CALL "BorrowBook"(%s, %s, %s::date, %s::date)', 
                        (member_id, book_id, loan_date, due_date))
         conn.commit()
     except Exception as e:
@@ -83,8 +83,7 @@ def borrow_book(cursor, conn, member_id, book_id, loan_date, due_date):
 
 def return_book(cursor, conn, borrow_id, return_date):
     try:
-        # Explicitly cast return_date to date
-        cursor.execute("SELECT ReturnBook(%s, %s::date)", (borrow_id, return_date))
+        cursor.execute('CALL "ReturnBook"(%s, %s::date)', (borrow_id, return_date))
         conn.commit()
     except Exception as e:
         conn.rollback()
