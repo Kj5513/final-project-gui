@@ -22,7 +22,7 @@ def fetch_all(cursor, query, params=None):
         cursor.execute(query, params or ())
         return cursor.fetchall()
     except Exception as e:
-        cursor.connection.rollback()  # rollback on error
+        cursor.connection.rollback()
         raise e
 
 def execute_commit(cursor, conn, query, params=None):
@@ -73,21 +73,23 @@ def update_book_copies(cursor, conn, book_id, copies):
 # === Borrow/Return Functions ===
 def borrow_book(cursor, conn, member_id, book_id, loan_date, due_date):
     try:
-        cursor.execute('CALL "BorrowBook"(%s, %s, %s::date, %s::date)', (member_id, book_id, loan_date, due_date))
+        # Call the BorrowBook function with SELECT
+        cursor.execute('SELECT "BorrowBook"(%s, %s, %s::date, %s::date)', (member_id, book_id, loan_date, due_date))
         conn.commit()
         st.success("Book borrowed successfully.")
     except Exception as e:
         conn.rollback()
-        st.error(f"Error calling BorrowBook procedure: {e}")
+        st.error(f"Error calling BorrowBook function: {e}")
 
 def return_book(cursor, conn, borrow_id, return_date):
     try:
-        cursor.execute('CALL "ReturnBook"(%s, %s::date)', (borrow_id, return_date))
+        # Assuming ReturnBook function exists similarly
+        cursor.execute('SELECT "ReturnBook"(%s, %s::date)', (borrow_id, return_date))
         conn.commit()
         st.success("Book returned successfully.")
     except Exception as e:
         conn.rollback()
-        st.error(f"Error calling ReturnBook procedure: {e}")
+        st.error(f"Error calling ReturnBook function: {e}")
 
 # === Fine Functions ===
 def pay_fine(cursor, conn, fine_id):
@@ -126,11 +128,11 @@ def search_unpaid_fines(cursor, member_id):
 
 def get_fine_audit_history(cursor):
     try:
-        cursor.execute("SELECT column_name FROM information_schema.columns WHERE table_name='fineaudit' ORDER BY ordinal_position")
+        cursor.execute("SELECT column_name FROM information_schema.columns WHERE table_name='fineaudithistory' ORDER BY ordinal_position")
         columns = [row[0] for row in cursor.fetchall()]
         if not columns:
             return [], []
-        query = f"SELECT {', '.join(columns)} FROM fineaudit ORDER BY timestamp DESC"
+        query = f"SELECT {', '.join(columns)} FROM FineAuditHistory ORDER BY changedate DESC"
         data = fetch_all(cursor, query)
         return columns, data
     except Exception as e:
@@ -271,4 +273,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
