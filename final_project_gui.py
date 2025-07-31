@@ -70,40 +70,33 @@ def update_book_copies(cursor, conn, book_id, copies):
         conn.rollback()
         raise e
 
-# === Borrow/Return Functions with dual try ===
+# === Borrow/Return Functions simplified to use procedure CALL only ===
 def borrow_book(cursor, conn, member_id, book_id, loan_date, due_date):
     try:
-        # Try function call first
-        cursor.execute('SELECT "BorrowBook"(%s, %s, %s::date, %s::date)', (member_id, book_id, loan_date, due_date))
+        cursor.execute('CALL "BorrowBook"(%s, %s, %s::date, %s::date)', (member_id, book_id, loan_date, due_date))
         conn.commit()
-    except Exception as e_func:
-        try:
-            # If function fails, try procedure call
-            cursor.execute('CALL "BorrowBook"(%s, %s, %s::date, %s::date)', (member_id, book_id, loan_date, due_date))
-            conn.commit()
-        except Exception as e_proc:
-            conn.rollback()
-            st.error(f"Error calling BorrowBook function: {e_func}\nError calling BorrowBook procedure: {e_proc}")
+        st.success("Book borrowed successfully.")
+    except Exception as e:
+        conn.rollback()
+        st.error(f"Error calling BorrowBook procedure: {e}")
 
 def return_book(cursor, conn, borrow_id, return_date):
     try:
-        cursor.execute('SELECT "ReturnBook"(%s, %s::date)', (borrow_id, return_date))
+        cursor.execute('CALL "ReturnBook"(%s, %s::date)', (borrow_id, return_date))
         conn.commit()
-    except Exception as e_func:
-        try:
-            cursor.execute('CALL "ReturnBook"(%s, %s::date)', (borrow_id, return_date))
-            conn.commit()
-        except Exception as e_proc:
-            conn.rollback()
-            st.error(f"Error calling ReturnBook function: {e_func}\nError calling ReturnBook procedure: {e_proc}")
+        st.success("Book returned successfully.")
+    except Exception as e:
+        conn.rollback()
+        st.error(f"Error calling ReturnBook procedure: {e}")
 
 # === Fine Functions ===
 def pay_fine(cursor, conn, fine_id):
     try:
         execute_commit(cursor, conn, "UPDATE fine SET paid = 'Yes' WHERE fineid = %s", (fine_id,))
+        st.success("Fine paid successfully.")
     except Exception as e:
         conn.rollback()
-        raise e
+        st.error(f"Error paying fine: {e}")
 
 def get_all_fines(cursor):
     query = """
@@ -220,6 +213,8 @@ def main():
         if st.button("Borrow Book"):
             if mem_id.isdigit() and book_id.isdigit() and loan_date and due_date:
                 borrow_book(cursor, conn, int(mem_id), int(book_id), loan_date, due_date)
+            else:
+                st.error("Please enter valid numeric Member ID, Book ID and valid dates.")
 
     with st.expander("Return Book"):
         borrow_id = st.text_input("Borrow ID", key="return_borrow_id")
@@ -227,6 +222,8 @@ def main():
         if st.button("Return Book"):
             if borrow_id.isdigit() and return_date:
                 return_book(cursor, conn, int(borrow_id), return_date)
+            else:
+                st.error("Please enter a valid Borrow ID and Return Date.")
 
     # --- Fines ---
     st.header("Fines Management")
@@ -235,6 +232,8 @@ def main():
         if st.button("Pay Fine"):
             if fine_id.isdigit():
                 pay_fine(cursor, conn, int(fine_id))
+            else:
+                st.error("Please enter a valid numeric Fine ID.")
 
     st.subheader("All Fines")
     fines = get_all_fines(cursor)
@@ -246,6 +245,8 @@ def main():
             if search_mem_id.isdigit():
                 unpaid = search_unpaid_fines(cursor, int(search_mem_id))
                 st.table(unpaid)
+            else:
+                st.error("Please enter a valid numeric Member ID.")
 
     st.subheader("Fine Audit History")
     columns, audit_data = get_fine_audit_history(cursor)
