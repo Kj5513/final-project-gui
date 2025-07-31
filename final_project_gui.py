@@ -18,59 +18,59 @@ def connect_to_database():
         return None
 
 def fetch_all(cursor, query, params=None):
-    cursor.execute(query, params or ())
-    return cursor.fetchall()
+    try:
+        cursor.execute(query, params or ())
+        return cursor.fetchall()
+    except Exception as e:
+        cursor.connection.rollback()  # rollback on error
+        raise e
 
 def execute_commit(cursor, conn, query, params=None):
-    cursor.execute(query, params or ())
-    conn.commit()
+    try:
+        cursor.execute(query, params or ())
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise e
 
 # === Member Functions ===
 def get_members(cursor):
-    return fetch_all(cursor, "SELECT memberid, name, email, phonenumber FROM member ORDER BY memberid")
+    try:
+        return fetch_all(cursor, "SELECT memberid, name, email, phonenumber FROM member ORDER BY memberid")
+    except Exception as e:
+        st.error(f"Error fetching members: {e}")
+        return []
 
 def add_member(cursor, conn, name, email, phone):
-    try:
-        execute_commit(cursor, conn, 
-            "INSERT INTO member (name, email, phonenumber) VALUES (%s, %s, %s)",
-            (name, email, phone)
-        )
-    except Exception as e:
-        conn.rollback()
-        raise e
+    execute_commit(cursor, conn, 
+        "INSERT INTO member (name, email, phonenumber) VALUES (%s, %s, %s)",
+        (name, email, phone)
+    )
 
 def delete_member(cursor, conn, member_id):
-    try:
-        execute_commit(cursor, conn, "DELETE FROM member WHERE memberid = %s", (member_id,))
-    except Exception as e:
-        conn.rollback()
-        raise e
+    execute_commit(cursor, conn, "DELETE FROM member WHERE memberid = %s", (member_id,))
 
 # === Book Functions ===
 def get_books(cursor):
-    return fetch_all(cursor, "SELECT bookid, title, author, copiesavailable FROM book ORDER BY bookid")
+    try:
+        return fetch_all(cursor, "SELECT bookid, title, author, copiesavailable FROM book ORDER BY bookid")
+    except Exception as e:
+        st.error(f"Error fetching books: {e}")
+        return []
 
 def add_book(cursor, conn, title, author, copies):
-    try:
-        execute_commit(cursor, conn,
-            "INSERT INTO book (title, author, copiesavailable) VALUES (%s, %s, %s)",
-            (title, author, copies)
-        )
-    except Exception as e:
-        conn.rollback()
-        raise e
+    execute_commit(cursor, conn,
+        "INSERT INTO book (title, author, copiesavailable) VALUES (%s, %s, %s)",
+        (title, author, copies)
+    )
 
 def update_book_copies(cursor, conn, book_id, copies):
-    try:
-        execute_commit(cursor, conn,
-            "UPDATE book SET copiesavailable = %s WHERE bookid = %s",
-            (copies, book_id)
-        )
-    except Exception as e:
-        conn.rollback()
-        raise e
+    execute_commit(cursor, conn,
+        "UPDATE book SET copiesavailable = %s WHERE bookid = %s",
+        (copies, book_id)
+    )
 
-# === Borrow/Return Functions simplified to use procedure CALL only ===
+# === Borrow/Return Functions ===
 def borrow_book(cursor, conn, member_id, book_id, loan_date, due_date):
     try:
         cursor.execute('CALL "BorrowBook"(%s, %s, %s::date, %s::date)', (member_id, book_id, loan_date, due_date))
@@ -95,36 +95,47 @@ def pay_fine(cursor, conn, fine_id):
         execute_commit(cursor, conn, "UPDATE fine SET paid = 'Yes' WHERE fineid = %s", (fine_id,))
         st.success("Fine paid successfully.")
     except Exception as e:
-        conn.rollback()
         st.error(f"Error paying fine: {e}")
 
 def get_all_fines(cursor):
-    query = """
-        SELECT f.fineid, f.borrowid, f.amount, f.paid, b.memberid, m.name
-        FROM fine f
-        JOIN borrow b ON f.borrowid = b.borrowid
-        JOIN member m ON b.memberid = m.memberid
-        ORDER BY f.fineid
-    """
-    return fetch_all(cursor, query)
+    try:
+        query = """
+            SELECT f.fineid, f.borrowid, f.amount, f.paid, b.memberid, m.name
+            FROM fine f
+            JOIN borrow b ON f.borrowid = b.borrowid
+            JOIN member m ON b.memberid = m.memberid
+            ORDER BY f.fineid
+        """
+        return fetch_all(cursor, query)
+    except Exception as e:
+        st.error(f"Error fetching fines: {e}")
+        return []
 
 def search_unpaid_fines(cursor, member_id):
-    query = """
-        SELECT f.fineid, f.borrowid, f.amount, f.paid
-        FROM fine f
-        JOIN borrow b ON f.borrowid = b.borrowid
-        WHERE b.memberid = %s AND f.paid = 'No'
-    """
-    return fetch_all(cursor, query, (member_id,))
+    try:
+        query = """
+            SELECT f.fineid, f.borrowid, f.amount, f.paid
+            FROM fine f
+            JOIN borrow b ON f.borrowid = b.borrowid
+            WHERE b.memberid = %s AND f.paid = 'No'
+        """
+        return fetch_all(cursor, query, (member_id,))
+    except Exception as e:
+        st.error(f"Error searching unpaid fines: {e}")
+        return []
 
 def get_fine_audit_history(cursor):
-    cursor.execute("SELECT column_name FROM information_schema.columns WHERE table_name='fineaudit' ORDER BY ordinal_position")
-    columns = [row[0] for row in cursor.fetchall()]
-    if not columns:
+    try:
+        cursor.execute("SELECT column_name FROM information_schema.columns WHERE table_name='fineaudit' ORDER BY ordinal_position")
+        columns = [row[0] for row in cursor.fetchall()]
+        if not columns:
+            return [], []
+        query = f"SELECT {', '.join(columns)} FROM fineaudit ORDER BY timestamp DESC"
+        data = fetch_all(cursor, query)
+        return columns, data
+    except Exception as e:
+        st.error(f"Error fetching fine audit history: {e}")
         return [], []
-    query = f"SELECT {', '.join(columns)} FROM fineaudit ORDER BY timestamp DESC"
-    data = fetch_all(cursor, query)
-    return columns, data
 
 # === Streamlit App ===
 def main():
@@ -260,3 +271,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
